@@ -1,7 +1,5 @@
 package clear.utils;
 
-
-
 import java.io.FileInputStream;
 import java.io.IOException;
 
@@ -28,6 +26,8 @@ import org.testng.Reporter;
 import org.testng.TestListenerAdapter;
 import org.testng.xml.XmlSuite;
  
+import clear.driver.TestDriver;
+
 import com.itextpdf.text.BaseColor;
 import com.itextpdf.text.Anchor;
 //-------------PDF imports-------------
@@ -60,23 +60,24 @@ public class PDFReport extends TestListenerAdapter implements IReporter
 {
     
     
-  private static int anchorLinkCount = 0;
+	private static int anchorLinkCount = 0;
     private static int anchorTargetCount = 0;
-    private static Font sagoe8 = FontFactory.getFont("Segoe UI Symbol", 9, Font.NORMAL);
-    private static Font sagoe8Bold = FontFactory.getFont("Segoe UI Symbol", 8, Font.BOLD);
-    private static Font sagoe8Link = FontFactory.getFont("Segoe UI Symbol", 9, Font.NORMAL,BaseColor.BLUE);
-    private static Font sagoe10Bold = FontFactory.getFont("Segoe UI Symbol", 10, Font.BOLD);
-    private static Font sagoe10 = FontFactory.getFont("Segoe UI Symbol", 10, Font.NORMAL);
-    private static Font sagoe12Bold = FontFactory.getFont("Segoe UI Symbol", 12, Font.BOLD);
-    private static Font sagoe12 = FontFactory.getFont("Segoe UI Symbol", 12, Font.NORMAL);
-    private static Font sagoe17Bold = FontFactory.getFont("Segoe UI Symbol", 17, Font.BOLD, BaseColor.WHITE);
-    private static Font sagoe16Bold = FontFactory.getFont("Segoe UI Symbol", 16, Font.BOLD, BaseColor.LIGHT_GRAY);
-    private static Font sagoe14Bold = FontFactory.getFont("Segoe UI Symbol", 14, Font.BOLD);
-     
-    private static Font sagoe16Symbol = FontFactory.getFont("Segoe UI Symbol", 14, Font.BOLD);
+   
+   
     
-    private static Font sagoe12Label = FontFactory.getFont("Segoe UI Symbol", 10, Font.BOLD,BaseColor.LIGHT_GRAY);
-    private static Font sagoe12value = FontFactory.getFont("Segoe UI Symbol", 10, Font.NORMAL,BaseColor.LIGHT_GRAY);
+    private static Font sagoe8;
+    private static Font sagoe8Bold;
+    private static Font sagoe8Link ;
+    private static Font sagoe10Bold;
+    private static Font sagoe10;
+    private static Font sagoe12Bold ;
+    private static Font sagoe12;
+    private static Font sagoe17Bold;
+    private static Font sagoe16Bold;
+    private static Font sagoe14Bold;
+    private static Font sagoe16Symbol;
+    private static Font sagoe12Label;
+    private static Font sagoe12value;
     
     private static BaseColor testTableclr = new BaseColor(196, 211, 226);
     private static BaseColor passColor = new BaseColor(164,196,0);
@@ -91,19 +92,38 @@ public class PDFReport extends TestListenerAdapter implements IReporter
     {
     	pdf = new Document( PageSize.A4);
     	pdf.setMargins(0, 0, 8	, 0);
+    	 
+    	 FontFactory.register("C:/Windows/Fonts/segoeui.TTF", "Segoe UI Symbol");
+    	
+    	FontFactory.getRegisteredFonts();
+    	
+		sagoe8 = FontFactory.getFont("Segoe UI Symbol", 9, Font.NORMAL);
+		sagoe8Bold = FontFactory.getFont("Segoe UI Symbol", 8, Font.BOLD);
+		sagoe8Link = FontFactory.getFont("Segoe UI Symbol", 9, Font.NORMAL,BaseColor.BLUE);
+		sagoe10Bold = FontFactory.getFont("Segoe UI Symbol", 10, Font.BOLD);
+		sagoe10 = FontFactory.getFont("Segoe UI Symbol", 10, Font.NORMAL);
+		sagoe12Bold = FontFactory.getFont("Segoe UI Symbol", 12, Font.BOLD);
+		sagoe12 = FontFactory.getFont("Segoe UI Symbol", 12, Font.NORMAL);
+		sagoe17Bold = FontFactory.getFont("Segoe UI Symbol", 17, Font.BOLD,BaseColor.WHITE);
+		sagoe16Bold = FontFactory.getFont("Segoe UI Symbol", 16, Font.BOLD,BaseColor.LIGHT_GRAY);
+		sagoe14Bold = FontFactory.getFont("Segoe UI Symbol", 14, Font.BOLD);
+		sagoe16Symbol = FontFactory.getFont("Segoe UI Symbol", 14, Font.BOLD);
+		sagoe12Label = FontFactory.getFont("Segoe UI Symbol", 10, Font.BOLD,BaseColor.LIGHT_GRAY);
+		sagoe12value = FontFactory.getFont("Segoe UI Symbol", 10, Font.NORMAL,BaseColor.LIGHT_GRAY);
  
         try {
         	
         	FileInputStream fip;
     		// load config.properties
         	settings = new Properties();
-    		
-    		fip = new FileInputStream("src\\test\\pat\\config\\config.properties");
+    		//TODO: make it dynamic
+        	
+    		fip = new FileInputStream(TestDriver.configPath + "/config.properties");
     		settings.load(fip);
     		
     		//create pdf file name
     		 
-            PdfWriter.getInstance(pdf,new FileOutputStream(settings.getProperty("REPORT_PDF") + "TestRerpot_" + (new SimpleDateFormat("ddMMMyyHHmma").format(new Date())) + ".pdf"));
+            PdfWriter.getInstance(pdf,new FileOutputStream(settings.getProperty("REPORT_PDF") + "TestReport_" + (new SimpleDateFormat("ddMMMyyHHmma").format(new Date())) + ".pdf"));
         	//PdfWriter.getInstance(pdf,new FileOutputStream("TestReport.pdf"));
             pdf.open();
             
@@ -201,13 +221,13 @@ public class PDFReport extends TestListenerAdapter implements IReporter
                
                ck = new Chunk("      Build#: ",sagoe12Label);
                paragraph.add(ck);
-               ck = new Chunk("32423",sagoe12value);
+               ck = new Chunk(TestDriver.buildNumber,sagoe12value);
                paragraph.add(ck);
                
                
                ck = new Chunk("      Tester: ",sagoe12Label);
                paragraph.add(ck);
-               ck = new Chunk("ptt4kor",sagoe12value);
+               ck = new Chunk(TestDriver.tester,sagoe12value);
                paragraph.add(ck);
                
                addEmptyLine(paragraph,1);
@@ -230,7 +250,7 @@ public class PDFReport extends TestListenerAdapter implements IReporter
  
     private  void addTestSummary(List<ISuite> suites) throws DocumentException {
           Paragraph para = null;
-          PdfPTable summaryTable = new PdfPTable(new float[]{.7f, .7f, .2f, .2f, .2f, .3f, .2f});
+          PdfPTable summaryTable = new PdfPTable(new float[]{.8f, .6f, .2f, .2f, .2f, .3f, .2f});
         	summaryTable.setWidthPercentage(95);
         	BaseColor summaryTabHeader = new BaseColor(196, 211, 226);
         	 
@@ -290,7 +310,7 @@ public class PDFReport extends TestListenerAdapter implements IReporter
 			         //End step table
                 	
 		          
-		           pc = new PdfPCell(new Phrase("Time   (in sec)",sagoe10Bold));
+		           pc = new PdfPCell(new Phrase("Time      (in sec)",sagoe10Bold));
 		           pc.setHorizontalAlignment(Element.ALIGN_LEFT);
 		           pc.setBackgroundColor(summaryTabHeader);
 		           summaryTable.addCell(pc);
@@ -685,8 +705,10 @@ public class PDFReport extends TestListenerAdapter implements IReporter
         	    String key = entry.getKey();
         	    String value = entry.getValue();
         	    
+        	    
+        	    
         	    //if not key is QUERY
-        	    if( !(key.trim().equalsIgnoreCase("QUERY")) && !(key.trim().equalsIgnoreCase("OBJECTIVE")) ){
+        	    if( !(key.trim().toUpperCase().contains("QUERY")) && !(key.trim().equalsIgnoreCase("OBJECTIVE")) ){
 	        	    pc 	= new PdfPCell(new Phrase(key, sagoe10));
 	                pc.setHorizontalAlignment(Element.ALIGN_MIDDLE);
 	                pc.setBackgroundColor(testTableclr);
@@ -796,11 +818,11 @@ private  void createMessageTable(ITestResult res) throws DocumentException, IOEx
     	Image ucImg = null;
   	  
     	int msgIndex = 1;
-    	stepsTable.setWidthPercentage(70);
+    	stepsTable.setWidthPercentage(72);
     	stepsTable.setSpacingBefore(5);
     	stepsTable.setHorizontalAlignment(Element.ALIGN_CENTER);
     	
-    	PdfPCell pc = new PdfPCell(new Phrase("Steps Performed...", sagoe14Bold));
+    	PdfPCell pc = new PdfPCell(new Phrase("Steps Performed", sagoe14Bold));
     	pc.setHorizontalAlignment(Element.ALIGN_CENTER);
         pc.setBackgroundColor(new BaseColor(125, 158, 192));
         pc.setBorder(Rectangle.BOTTOM);
@@ -858,7 +880,14 @@ private  void createMessageTable(ITestResult res) throws DocumentException, IOEx
         		}
         		else if(msgType.equalsIgnoreCase("[I]")){	
         			stepPara.add(new Chunk(infoImg,-2,-2));
-        			stepPara.add(new Chunk(message, sagoe10));
+        			
+        			if(message.length()>72){
+        				stepPara.add(new Chunk(message.substring(0, 72) + "...", sagoe10));
+        			}
+        			else{
+        				stepPara.add(new Chunk(message, sagoe10));
+        			}
+        				
         			pc.setIndent(53);
         		}
         		else if(msgType.equalsIgnoreCase("[W]")){	
