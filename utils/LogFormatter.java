@@ -11,7 +11,7 @@ import java.text.SimpleDateFormat;
 * @version 1.0
 */
 public class LogFormatter extends Formatter {
-  
+	
 	
     private static final DateFormat df = new SimpleDateFormat("dd/MM/yyyy hh:mm:ss.SSS");
     /**
