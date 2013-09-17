@@ -11,6 +11,8 @@ import java.text.DecimalFormat;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Date;
+import java.util.HashMap;
+import java.util.List;
 import java.util.Properties;
 import java.util.concurrent.TimeUnit;
 import java.util.logging.FileHandler;
@@ -23,9 +25,7 @@ import java.util.regex.Pattern;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.xerces.impl.xs.identity.Selector.Matcher;
-import org.junit.Assert;
-import org.junit.Before;
-import org.junit.BeforeClass;
+
 import org.openqa.selenium.Alert;
 import org.openqa.selenium.By;
 import org.openqa.selenium.JavascriptExecutor;
@@ -44,13 +44,18 @@ import org.openqa.selenium.interactions.Actions;
 import org.openqa.selenium.remote.Augmenter;
 import org.openqa.selenium.remote.DesiredCapabilities;
 import org.openqa.selenium.remote.RemoteWebDriver;
+import org.openqa.selenium.remote.UnreachableBrowserException;
 import org.openqa.selenium.support.ui.ExpectedCondition;
 import org.openqa.selenium.support.ui.ExpectedConditions;
 import org.openqa.selenium.support.ui.FluentWait;
 import org.openqa.selenium.support.ui.Wait;
 import org.openqa.selenium.support.ui.WebDriverWait;
+import org.testng.Assert;
 import org.testng.ITestContext;
 import org.testng.Reporter;
+import org.testng.annotations.AfterClass;
+import org.testng.annotations.BeforeClass;
+import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.DataProvider;
 import org.testng.xml.XmlTest;
 import org.testng.Assert.*;
@@ -59,6 +64,7 @@ import clear.utils.ExcelData;
 import clear.utils.LogFormatter;
 import clear.utils.OraDBData;
 import clear.utils.PropertyLoader;
+import clear.utils.TestUtils;
 
 import com.google.common.base.Function;
 
@@ -70,9 +76,9 @@ import test.pat.common.PATCommon;
 * @version 1.0
 */
 @SuppressWarnings("unused")
-public class TestDriver {
+public  class TestDriver {
 
-  public static Properties config = null;
+	public static Properties config = null;
 	public static Properties or = null;
 	public static PropertyLoader propLoader = null;
 	public static WebDriver dr = null;
@@ -80,19 +86,26 @@ public class TestDriver {
 	public static OraDBData db = null;
 	
 	public static FileInputStream fip = null;
-	public static String aut = null; 
-	public static String autPath = null;
-	public static String orPath = null;
-	public static String configPath = null;
-	public static String dataSheetPath = null;
-	public static String executionMachine = null;
-	public static String remoteMachine = "10.47.120.161";
+	public static String aut; 
+	public static String autPath;
+	public static String orPath;
+	public static String configPath;
+	public static String dataSheetPath;
+	public static String executionMachine;
+	public static String buildNumber;
+	public static String tester;
+	public String actual, expected;
 	static URL url = null;
+	public static TestUtils testUtils = null;
 	
 	static FileHandler hand = null;
 	static Logger log = null;
-
-
+	
+	public static enum LogType{ INFO, PASS, SOFTFAIL , WARNING, 
+									SCREENSHOT, UNCOMPLETED, TEXTLOGONLY, HARDFAIL};
+	
+	
+	
 	/**
 	 * This method is to initiate the test script execution. 
 	 * @param 
@@ -100,17 +113,25 @@ public class TestDriver {
 	 * @throws 
 	 * @author ptt4kor
 	 */
-	public static void init() {
-		
+    @BeforeClass									
+	public static void initExecution(ITestContext context) {
 		
 		db = new OraDBData();
 		propLoader = new PropertyLoader();
 		
+		//validate test setup 
+		testSetupValidator(context);
+				
+		//intitate ExcelData
+		xl =new ExcelData();
+		
+		//create testUtils object
+		testUtils = new TestUtils();
 	
 		// load config.properties
 		config = new Properties();
 		try {
-			fip = new FileInputStream(configPath + "\\config.properties");
+			fip = new FileInputStream(configPath + "/config.properties");
 			config.load(fip);
 			ReportLog("Load config.prop ", LogType.PASS);
 			
@@ -122,14 +143,13 @@ public class TestDriver {
 		//load object repository
 		or = new Properties();
 		or = propLoader.loadOR(new File(orPath));
-				
-	
+
+		
 		// create driver object based on browser
 		try {
 			 url = new URL( "http", executionMachine, 4444, "/wd/hub" );
 		} catch (MalformedURLException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
+			ReportLog("Execution machine ip or port or path is incorrect", LogType.UNCOMPLETED);
 		}
 		
 		
@@ -140,15 +160,11 @@ public class TestDriver {
 			profile.setPreference("browser.download.folderList", 2);
 			profile.setPreference("browser.download.manager.showWhenStarting",false);*/
 			DesiredCapabilities ffCapabilities = DesiredCapabilities.firefox();
-			
-			//dr = new FirefoxDriver(profile);
 			dr = new  RemoteWebDriver( url, ffCapabilities);
 
 		} else if (config.getProperty("BROWSER").equals("IE")) {
 			ReportLog("Browser to be used for testing: IE ", LogType.INFO);
-			
-			
-			System.setProperty("webdriver.ie.driver","C:\\servers\\ie\\IEDriverServer.exe");
+			System.setProperty("webdriver.ie.driver","C:/servers/ie/IEDriverServer.exe");
 			
 			DesiredCapabilities ieCapabilities = DesiredCapabilities.internetExplorer();
 			
@@ -158,7 +174,12 @@ public class TestDriver {
 			ieCapabilities.setPlatform(Platform.ANY);
 			
 			//dr = new InternetExplorerDriver(ieCapabilities);
+			try{
 			dr = new RemoteWebDriver( url, ieCapabilities);
+			}
+			catch(UnreachableBrowserException e){
+				ReportLog("Selenium server is NOT started or unreachable", LogType.UNCOMPLETED);
+			}
 			
 
 		} else {
@@ -167,9 +188,9 @@ public class TestDriver {
 }
 	
 	static
-	{
+	{ 
 		try {
-			FileHandler hand = new FileHandler("test-report\\log\\log" + (new SimpleDateFormat("ddMMMyyHHmma").format(new Date())) + ".log");
+			FileHandler hand = new FileHandler("test-report/log/log" + (new SimpleDateFormat("ddMMMyyHHmma").format(new Date())) + ".log");
 			
 			LogFormatter slf = new LogFormatter();
 			
@@ -178,7 +199,6 @@ public class TestDriver {
 			hand.setLevel(Level.ALL);
 			log = Logger.getLogger("TEXTLOG");
 			log.addHandler(hand);
-		 
 		}
 		 catch (Exception e) {
 			 ReportLog("Failed to create log file..",LogType.SOFTFAIL);
@@ -193,6 +213,7 @@ public class TestDriver {
 	 * @throws 
 	 * @author ptt4kor
 	 */
+	@AfterClass
 	public static void cleanSetup() {
 		dr.close();
 	}
@@ -211,11 +232,6 @@ public class TestDriver {
 		String sheetName = null;
 		Object[][] data = null;
 		
-		//validate test setup 
-		testSetupValidator(context);
-		
-		//intitate ExcelData
-		xl =new ExcelData();
 		
 		
 		try {
@@ -265,19 +281,20 @@ public class TestDriver {
 		ReportLog("Validating test setup..", LogType.TEXTLOGONLY);
 		
 		//read the aut from XML
-		aut = context.getCurrentXmlTest().getParameter("aut");
-		executionMachine = context.getCurrentXmlTest().getParameter("ip");
+		aut = context.getCurrentXmlTest().getParameter("aut").trim();
+		executionMachine = context.getCurrentXmlTest().getParameter("ip").trim();
+		buildNumber = context.getCurrentXmlTest().getParameter("build").trim();
+		tester = "PTT4KOR";
 		
-		aut = aut.trim();
 		//check if application name is not passed
-		if(aut.trim().isEmpty()){
+		if(aut.isEmpty()){
 			ReportLog("Unable to find 'aut' parameter in the xml", LogType.UNCOMPLETED);
 		}
 		else{
 			ReportLog("Application under test: " + aut , LogType.TEXTLOGONLY);
 		}
 		
-		if(executionMachine.trim().isEmpty()){
+		if(executionMachine.isEmpty()){
 			ReportLog("Unable to find 'ip' parameter in the xml", LogType.UNCOMPLETED);
 		}
 		else{
@@ -285,7 +302,7 @@ public class TestDriver {
 		}
 		
 		//check existance of app folder inside test
-		autPath = "src\\test\\" + aut;
+		autPath = "src/test/" + aut;
 		directory = new File(autPath);
 		if(directory.exists() && directory.isDirectory()){
 			ReportLog("Folder " + autPath +  " exists", LogType.TEXTLOGONLY);
@@ -295,7 +312,7 @@ public class TestDriver {
 		}
 		
 		//check existance of config folder
-		configPath = autPath + "\\config";
+		configPath = autPath + "/config";
 		directory = new File(configPath);
 		if(directory.exists() && directory.isDirectory()){
 			ReportLog("Config folder " + configPath +  " exists", LogType.TEXTLOGONLY);
@@ -305,7 +322,7 @@ public class TestDriver {
 		}
 				
 		//check existance of OR folder
-		orPath = autPath + "\\or";
+		orPath = autPath + "/or";
 		directory = new File(orPath);
 		if(directory.exists() && directory.isDirectory()){
 			ReportLog("Object Repository folder " + orPath +  " exists", LogType.TEXTLOGONLY);
@@ -315,7 +332,7 @@ public class TestDriver {
 		}
 		
 		//check existance of data sheet folder
-		dataSheetPath = "resources//datasheet//" + aut ;
+		dataSheetPath = "resources/datasheet/" + aut ;
 		directory = new File(dataSheetPath);
 		if(directory.exists() && directory.isDirectory()){
 			ReportLog("Data Sheet folder " + dataSheetPath +  " exists", LogType.TEXTLOGONLY);
@@ -344,6 +361,27 @@ public class TestDriver {
 				ReportLog("Element " + elementName + " NOT present. Locator text:" + locator.toString(), LogType.HARDFAIL);
 			}
 		return isPresent;
+	}
+	
+	/**
+	 * This method is 
+	 * @param locator
+	 * @throws  
+	 * @author ptt4kor
+	 * 
+	 */
+	
+	public static boolean isElementVisible(By locator) {
+		boolean isVisible= false;
+		try{
+			WebElement we = dr.findElement(locator);
+			isVisible = we.isEnabled();
+		}
+		catch(Exception e){
+			return false;
+		}
+		
+		return isVisible;
 	}
 	
 
@@ -521,6 +559,25 @@ public class TestDriver {
 		 return element!=null;
 	}
 	
+	/**
+	 * Waits in secods
+	 * @param seconds
+	 * @throws 
+	 * @return 
+	 * @author ptt4kor
+	 */
+	public static void wait(final int secs)  {
+		
+		try{
+			Thread.sleep(secs * 1000);
+		}
+		
+		catch(Exception e){
+			ReportLog("Exception in wait", LogType.WARNING);
+		}
+		
+	}
+	
 	
 	/**
 	 * This method is to check whether alert box is present or not
@@ -601,6 +658,101 @@ public class TestDriver {
 		
 	}
 	
+	/**
+	 * This method gets row count in table
+	 * @param xpath of the table
+	 * @return row count in the table
+	 * @throws Exception
+	 * @author ptt4kor
+	 */
+	
+	public static int getTableRowCountUsingXpath(String elementInfo) throws InterruptedException
+	{
+		
+		By locator = By.xpath(getIdentifier(elementInfo)+ "//tr");
+		int rowCount = 0;
+		if(isElementPresent(locator, getIdentifierText(elementInfo))){
+			 List<WebElement> trs = dr.findElements(locator);
+		     rowCount = trs.size();
+		    }
+		else{
+			ReportLog("Unable to get the row count of " + getIdentifierText(elementInfo) + "element" ,LogType.HARDFAIL);
+		}
+		
+		return rowCount;
+	}
+	
+	/**
+	 * This method gets columns count in table(first row)
+	 * @param xpath of the table
+	 * @return row count in the table
+	 * @throws Exception
+	 * @author ptt4kor
+	 */
+	
+	public static int getTableColCountUsingXpath(String elementInfo) throws InterruptedException
+	{
+		
+		By locator = By.xpath(getIdentifier(elementInfo)+ "//tr[1]/td");
+		int colCount = 0;
+		if(isElementPresent(locator, getIdentifierText(elementInfo))){
+			 List<WebElement> trs = dr.findElements(locator);
+			 colCount = trs.size();
+		    }
+		else{
+			ReportLog("Unable to get the col count of " + getIdentifierText(elementInfo) + "element" ,LogType.HARDFAIL);
+		}
+		
+		return colCount;
+	}
+	
+	/**
+	 * This method returns the tag info
+	 * @param xpath of the td or div which contains UL tags
+	 * @return row count in the table
+	 * @throws Exception
+	 * @author ptt4kor
+	 */
+	
+	public static int getUlTagCount(String elementInfo) throws InterruptedException
+	{
+		
+		By locator = By.xpath(getIdentifier(elementInfo)+ "/ul");
+		int colCount = 0;
+		if(isElementPresent(locator, getIdentifierText(elementInfo))){
+			 List<WebElement> trs = dr.findElements(locator);
+			 colCount = trs.size();
+		    }
+		else{
+			ReportLog("Unable to get the Ul tag count of " + getIdentifierText(elementInfo) + "element" ,LogType.HARDFAIL);
+		}
+		
+		return colCount;
+	}
+	
+	/**
+	 * This method returns the tag info
+	 * @param xpath of the td or div which contains UL tags
+	 * @return row count in the table
+	 * @throws Exception
+	 * @author ptt4kor
+	 */
+	
+	public static int getDivTagCount(String elementInfo) throws InterruptedException
+	{
+		
+		By locator = By.xpath(getIdentifier(elementInfo)+ "/div");
+		int colCount = 0;
+		if(isElementPresent(locator, getIdentifierText(elementInfo))){
+			 List<WebElement> trs = dr.findElements(locator);
+			 colCount = trs.size();
+		    }
+		else{
+			ReportLog("Unable to get the div tag count of " + getIdentifierText(elementInfo) + "element" ,LogType.HARDFAIL);
+		}
+		
+		return colCount;
+	}
 	
 	/**
 	 * This method is to get the identifier from Object repository property file. (value before the #)
@@ -644,41 +796,41 @@ public class TestDriver {
 	 * @throws 
 	 * @author ptt4kor
 	 */
-	public static void ReportLog(String message,int type){
+	public static void ReportLog(String message, LogType type){
+		//get the name of the method
+		
 		String methodName =Thread.currentThread().getStackTrace()[2].getMethodName();
-		System.out.println("methodName = " + methodName);
-
-		switch(type){
-		case LogType.INFO:
+	switch(type){
+		case INFO:
 			Reporter.log(message+ " [I]");
 			log.info("["+ methodName + "] - [INFO] - " + message );
 			break;
-		case LogType.PASS:
+		case PASS:
 			Reporter.log(message+ " [P]");
 			log.info("["+ methodName + "] - [PASS] - " + message );
 			break;
-		case LogType.SOFTFAIL:
+		case SOFTFAIL:
 			Reporter.log(message+ " [F]");
 			log.info("["+ methodName + "] - [SOFTFAIL] - " + message );
 			takeSaveScreenShot();
 			break;
-		case LogType.WARNING:
+		case WARNING:
 			Reporter.log(message+ " [W]");
 			log.info("["+ methodName + "] - [WARNING] - " + message );
 			break;
-		case LogType.SCREENSHOT:
+		case SCREENSHOT:
 			Reporter.log(message+ " [J]");
 			log.info("["+ methodName + "] - [JPG] - " + "Screenshot taken, file name is " + message + ".jpg" );
 			break;
-		case LogType.UNCOMPLETED:
+		case UNCOMPLETED:
 			Reporter.log(message+ " [U]");
 			log.info("["+ methodName + "] - [UNCOMPLETED] - " + message );
 			Assert.fail(message);
 			break;
-		case LogType.TEXTLOGONLY:
+		case TEXTLOGONLY:
 			log.info("["+ methodName + "] - [LOG] - " + message );
 			break;
-		case LogType.HARDFAIL:
+		case HARDFAIL:
 			Reporter.log(message+ " [S]");
 			log.info("["+ methodName + "] - [HARDFAIL] - " + message );
 			takeSaveScreenShot();
@@ -733,11 +885,11 @@ public class TestDriver {
 		//try to match without ignoring case
 		if(!actual.equals(expected)){
 			if(actual.equalsIgnoreCase(expected)){
-				ReportLog(field + " values matched."  , LogType.PASS);
+				ReportLog(field + " values matched"  , LogType.PASS);
 				ReportLog(field + " values matched by ignoring case"  , LogType.WARNING);
 			}
 			else{
-				ReportLog(field + " values NOT matched.", LogType.SOFTFAIL);
+				ReportLog(field + " values NOT matched", LogType.SOFTFAIL);
 			}
 		}
 		else{
@@ -746,7 +898,7 @@ public class TestDriver {
 		
 		//display expected n actual
 		//display in 2 lines if charcter are more
-		if(expected.length()+actual.length() > 58){
+		if(expected.length()+actual.length() > 52){
 		ReportLog("Expected: " + expected  , LogType.INFO);
 		ReportLog("Actual: " + actual , LogType.INFO);
 		}
@@ -764,15 +916,31 @@ public class TestDriver {
 	 */
 	public static void match(double expected, double actual, String field){
 		if(actual == expected){
-			ReportLog(field + " values matched."  , LogType.PASS);
+			ReportLog(field + " values matched"  , LogType.PASS);
 			
 		}
 		else{
-			ReportLog(field + " values NOT matched.", LogType.SOFTFAIL);
+			ReportLog(field + " values NOT matched", LogType.SOFTFAIL);
 		}
 		ReportLog("Expected: " + expected + " Actual: " + actual , LogType.INFO);
     }
 	
+	/**
+	 * Method to compare integer type values 
+	 * @param message to be printed on report, LogType 
+	 * @return type of log could be any one of LogType
+	 * @throws 
+	 * @author ptt4kor
+	 */
+	public static void match(int expected, int actual, String field){
+		if(actual == expected){
+			ReportLog(field + " values matched"  , LogType.PASS);
+		}
+		else{
+			ReportLog(field + " values NOT matched", LogType.SOFTFAIL);
+		}
+		ReportLog("Expected: " + expected + " Actual: " + actual , LogType.INFO);
+    }
 	
 	/**
 	 * Method to compare String type values 
@@ -783,14 +951,13 @@ public class TestDriver {
 	 */
 	public static void match(Date expected, Date actual, String field){
 		if(actual.equals(expected)){
-			ReportLog(field + " values matched."  , LogType.PASS);
+			ReportLog(field + " values matched"  , LogType.PASS);
 		}
 		else{
-			ReportLog(field + " values NOT matched.", LogType.SOFTFAIL);
+			ReportLog(field + " values NOT matched", LogType.SOFTFAIL);
 		}
 		
-		ReportLog("Expected: " + expected  , LogType.INFO);
-		ReportLog("Actual: " + actual , LogType.INFO);
+		ReportLog("Expected: " + testUtils.getFormattedDate(expected, "MM/dd/yyyy") + " Actual: " + testUtils.getFormattedDate(actual, "MM/dd/yyyy") , LogType.INFO);
 	}
 	
 	/**
@@ -807,18 +974,4 @@ public class TestDriver {
 		hoverOver.perform();
 	}
 	
-	
-	
-	public class LogType{
-		public static final int INFO = 0;
-		public static final int PASS = 1;
-		public static final int SOFTFAIL = 2;
-		public static final int WARNING = 3;
-		public static final int SCREENSHOT = 4;
-		public static final int UNCOMPLETED = 5;
-		public static final int TEXTLOGONLY = 6;
-		public static final int HARDFAIL = 7;
-	}
-	
-
 }
