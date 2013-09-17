@@ -14,11 +14,12 @@ import java.util.List;
 import java.util.Properties;
 
 import clear.driver.TestDriver;
+import clear.driver.TestDriver.*;
 
 
 
-public class OraDBData extends TestDriver {
-  
+public class OraDBData  {
+	
 	 private static Connection connection = null;
 	 static Properties dbConnProp = null;
 	 
@@ -29,31 +30,31 @@ public class OraDBData extends TestDriver {
 		 * @throws 
 		 * @author ptt4kor
 		 */
-	 public void connect(String uri, String userid, String password)
+	 public static void connect(String uri, String userid, String password)
 	    {
 		 try {
 			 //connect if not already connected
 			if(connection == null)	{
 				Class.forName("oracle.jdbc.driver.OracleDriver"); //Or any other driver
 				connection = DriverManager.getConnection(uri, userid, password);
-				ReportLog("Oracle connection successful", LogType.PASS);
-				ReportLog("Connection url:"+ uri, LogType.INFO);
-				ReportLog("User id: "+ userid + "Password: "+ password, LogType.INFO);
+				TestDriver.ReportLog("Oracle connection successful", LogType.PASS);
+				TestDriver.ReportLog("Connection url:"+ uri, LogType.INFO);
+				TestDriver.ReportLog("User id: "+ userid + "Password: "+ password, LogType.INFO);
 			}
 			}
 			catch(SQLException e ){
 				e.printStackTrace();
 				System.out.println( "Couldn’t get the connection!" );
 				
-				ReportLog("Unable to connect to DB."+ e.getMessage(), LogType.UNCOMPLETED);
-				ReportLog("SQL Exception occured", LogType.TEXTLOGONLY);
+				TestDriver.ReportLog("Unable to connect to DB."+ e.getMessage(), LogType.UNCOMPLETED);
+				TestDriver.ReportLog("SQL Exception occured", LogType.TEXTLOGONLY);
 			} 
 		 
 		 catch(Exception ex ){
 				ex.printStackTrace();
 				System.out.println( "Couldn’t get the connection!" + ex.getMessage() );
-				ReportLog(" Exception occured" + ex.getMessage() , LogType.TEXTLOGONLY);
-				ReportLog("Unable to connect to DB." + ex.getMessage(), LogType.UNCOMPLETED);
+				TestDriver.ReportLog(" Exception occured" + ex.getMessage() , LogType.TEXTLOGONLY);
+				TestDriver.ReportLog("Unable to connect to DB." + ex.getMessage(), LogType.UNCOMPLETED);
 			} 
 		
 		
@@ -120,7 +121,7 @@ public class OraDBData extends TestDriver {
 			ResultSetMetaData rsmd = null;
 			HashMap<String,String> map = null;
 			String dbUri, uid, pw = null;
-			
+			TestDriver.ReportLog("Query: " + sql , LogType.TEXTLOGONLY);
 		 
 		 try{
 			 	loadConfigFile();
@@ -151,13 +152,13 @@ public class OraDBData extends TestDriver {
 					resultSet.add(map);
 				}
 				
-				ReportLog(resultSet.size() + " record(s) fetched from DB", LogType.PASS);
+				TestDriver.ReportLog(resultSet.size() + " record(s) fetched from DB", LogType.PASS);
 				//close the connection
 				oraConnCleanUp();
 		 }
 		 catch(Exception e){
 			 System.out.println(e.getMessage());
-			 ReportLog("Unable to execute the query", LogType.UNCOMPLETED);
+			 TestDriver.ReportLog("Unable to execute the query", LogType.UNCOMPLETED);
 			 oraConnCleanUp();
 		 }
 		 
