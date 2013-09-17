@@ -2,7 +2,11 @@ package clear.utils;
 
 import java.io.File;
 import java.io.FileInputStream;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
+import java.util.ListIterator;
+
 import jxl.Sheet;
 import jxl.Workbook;
 import jxl.WorkbookSettings;
@@ -14,18 +18,7 @@ import jxl.WorkbookSettings;
 */
  
 public class ExcelData {
-  //column number for checking condition 1
-	public static final int col1=0;
-	//column number for checking condition 2
-	public static final int col2=1;
-	//column number for checking condition 3
-	public static final int col3=2;
-	//column number for checking condition 4
-	public static final int col4=3;
-	//column number for checking condition 5
-	public static final int col5=4;
-	//column number for checking condition 6
-	public static final int col6=5;
+	
 	//input column number
 	public static final int input_col=6;
 	//output column number
@@ -46,6 +39,9 @@ public class ExcelData {
 		Sheet sheet = null;
 		Object [][] sheetdata=null;
 		HashMap<String, String> map = null;
+		List<HashMap<String,String>> tempDataSheet = new ArrayList<HashMap<String,String>>();
+		ListIterator<HashMap<String,String>> lstIterator = null;
+		
 		int rowcount=0;
 		int colcount=0;
 			//create input stream of the file
@@ -55,20 +51,40 @@ public class ExcelData {
   			sheet = workbook.getSheet(0);
   			rowcount = sheet.getRows();
   			colcount = sheet.getColumns();
-  			sheetdata = new Object[rowcount-1][1];
+  			
+  			//sheetdata = new Object[rowcount-1][1];
 
   			for(int i=0;i<rowcount-1;i++)
   			{
   				map = new HashMap<String, String>();
-  				for(int j=0;j<colcount;j++)
-  				{
-  					map.put(sheet.getCell(j, 0).getContents(), sheet.getCell(j, i+1).getContents());
+  				for(int j=0;j<colcount;j++){
+  					//key will always be upper case
+  					map.put(sheet.getCell(j, 0).getContents().toUpperCase(), sheet.getCell(j, i+1).getContents().trim());
   				}
-  				System.out.println();
-  				sheetdata[i][0] = map;
+  				tempDataSheet.add(map);
+  				//sheetdata[i][0] = map;
   			}
 		
-  		return sheetdata;
+  			//ignore the rows if Execute coumn is Y
+  			lstIterator = tempDataSheet.listIterator();
+  			
+  			//TODO: handle execeptions if column header is something else or if 'Execute'
+  			while(lstIterator.hasNext()){
+  				HashMap<String,String> tempMap = lstIterator.next();
+  				
+  				if(tempMap.get("EXECUTE").equalsIgnoreCase("N") || tempMap.get("EXECUTE").trim().isEmpty()){
+  					lstIterator.remove();
+  				}
+  			}
+  			
+  			sheetdata = new Object[tempDataSheet.size()][1];
+  			lstIterator = tempDataSheet.listIterator();
+  			//copy list data to array
+  			while(lstIterator.hasNext()){
+  				sheetdata[lstIterator.nextIndex()][0] = lstIterator.next();
+			}
+  		
+  			return sheetdata;
 	}
 	
 	
