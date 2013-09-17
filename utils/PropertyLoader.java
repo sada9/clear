@@ -10,11 +10,19 @@ import java.util.Iterator;
 import java.util.Properties;
 import java.util.Set;
 
+import clear.driver.TestDriver;
+import clear.driver.TestDriver.LogType;
+
 
 @SuppressWarnings("unused")
+/**
+* This class reads all the properties file in test.xxx.or and creates one properties object
+* @author ptt4kor
+* @version 1.0
+*/
 public class PropertyLoader {
 
-  Properties appOR = null;
+	Properties appOR = null;
 	/**
 	 * This method loads all properties files to appOR object
 	 * @param Folder where properties are located
@@ -24,9 +32,19 @@ public class PropertyLoader {
 	 */
 	public Properties loadOR(final File folder) {
 		appOR = new Properties();
+		//from the or folder pass properties files one by one
 	    for (final File file: folder.listFiles()) {
+	    	String fileName = file.getName().trim();
+	    	String fileType = "";
+	    	if(fileName.length()>10){
+	    	fileType = fileName.substring(fileName.length()-10,fileName.length());
+	    	}
+	    	
+	    	//load only if file type is properties
+	    	if(fileType.equalsIgnoreCase("Properties"))
 	    	loadPropertyFile(file);
 	    }
+	    
 	    return appOR;
 	}
 	
@@ -52,12 +70,11 @@ public class PropertyLoader {
 			InputStream flStream = new FileInputStream(pFile);
 			fileProp.load(flStream);
 			
-			//move all properties to OR property
-			movePropertiesToOR(fileProp,fileName );
+			//move all properties to appOR property
+			putPropertiesToOR(fileProp,fileName );
 			
 			//close stream
 			flStream.close();
-			
 		} 
 		
 		catch (IOException e) {
@@ -75,8 +92,9 @@ public class PropertyLoader {
 	 * @throws 
 	 * @author ptt4kor
 	 */
-	public void movePropertiesToOR(final Properties prop, String propertyFileName) {
+	public void putPropertiesToOR(final Properties prop, String propertyFileName) {
 		System.out.println("Loading " + propertyFileName + " prop file");
+		TestDriver.ReportLog("Loading " + propertyFileName + " property file", LogType.TEXTLOGONLY);
 		String key, value = null;
 		
 		// get set-view of keys
@@ -85,23 +103,8 @@ public class PropertyLoader {
 		      key = (String) e.nextElement();
 		      value = prop.getProperty(key);
 		      
-		      System.out.println(propertyFileName + "." + key);
-		      
+		      TestDriver.ReportLog("Adding " + propertyFileName + "." + key, LogType.TEXTLOGONLY);
 		      appOR.setProperty(propertyFileName + "." + key, value);
 		    }
 	}
-	
-	public String getWebObject(final String key) {
-		return 	(String) appOR.get(key);
-	}
-
-	public static void main(String[] args){
-		PropertyLoader p = new PropertyLoader();
-		final File folder = new File("src\\test\\pat\\or");
-		p.loadOR(folder);
-		//System.out.println(p.getProp("orPATMainPg.TD_XP_VAL_PATNAME"));
-		//System.out.println(p.getProp("orDesktopMainPg.TD_XP_SSNSEARCH"));
-	}
-
-
 }
